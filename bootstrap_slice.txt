@@ -1,0 +1,61 @@
+#!/bin/sh
+
+trap "exit 2" 1 2 3 13 15
+
+##
+# Ubuntu.
+if [ -f "/etc/lsb-release" ]; then
+  ### Supported releases.
+  ISSUE="`awk '{print $2}' /etc/issue`"
+  case "${ISSUE}" in
+    8.04) RELEASE="hardy" ;;
+    8.10) RELEASE="intrepid" ;;
+    9.04) RELEASE="jaunty" ;;
+    9.10) RELEASE="karmic" ;;
+    *) echo "[ERROR] Release '${ISSUE}' not supported!" && exit ;;
+  esac
+	
+  ### Backup sources.list file
+  cp /etc/apt/sources.list /etc/apt/sources.list.backup
+
+  ### Enable universe sources.
+  sed -i -e 's/#deb/deb/g' /etc/apt/sources.list
+
+  ### Add opscode sources to apt-get.
+  echo "deb http://apt.opscode.com/ ${RELEASE} universe" > /etc/apt/sources.list.d/opscode.list
+  curl http://apt.opscode.com/packages@opscode.com.gpg.key | apt-key add - || exit 1
+  apt-get update -y
+
+  ### Upgrade all packages.
+  apt-get upgrade -y --force-yes
+
+  ### Install Chef.
+  apt-get install -y ohai chef
+
+  ### Install Git.
+  apt-get install -y git-core
+
+  ### Install REE Prerequisites
+  apt-get install -y build-essential zlib1g-dev libssl-dev libreadline5-dev 
+
+  ### Install REE
+  cd /tmp && wget http://rubyforge.org/frs/download.php/64475/ruby-enterprise-1.8.7-20090928.tar.gz
+  tar xzvf ruby-enterprise-1.8.7-20090928.tar.gz
+  cd ruby-enterprise-1.8.7-20090928 && ./installer --auto=/usr/local/ruby-enterprise
+
+  ### Add REE binaries to your PATH
+  echo 'PATH=/usr/local/ruby-enterprise/bin:$PATH' >> /etc/environment
+
+  ### Install Extras.
+  # apt-get install -y postgresql-8.3-plruby rubygems libopenssl-ruby1.8  
+  # libmysql-ruby
+
+  ### Run chef solo.
+  # cd /tmp && git clone git://github.com/retr0h/chef_solo_os.git && cd /tmp/chef_solo_os || exit 1
+  # chef-solo -l debug -c config/solo.rb -j config/dna.json
+else
+  echo "[ERROR] OS unsupported."
+fi
+
+
+exit 0
